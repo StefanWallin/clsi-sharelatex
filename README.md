@@ -3,6 +3,8 @@ clsi-sharelatex
 
 A web api for compiling LaTeX documents in the cloud
 
+[![Build Status](https://travis-ci.org/sharelatex/clsi-sharelatex.png?branch=master)](https://travis-ci.org/sharelatex/clsi-sharelatex)
+
 Installation
 ------------
 
@@ -16,7 +18,7 @@ Then install the require npm modules:
     
 Then compile the coffee script source files:
 
-    $ grunt compile
+    $ grunt install
     
 Finally, (after configuring your local database - see the Config section), run the CLSI service:
 
@@ -38,21 +40,21 @@ The CLSI is based on a JSON API.
 
 (Note that valid JSON should not contain any comments like the example below).
 
-    POST /project/<project-id>
+    POST /project/<project-id>/compile
 
 ```javascript
 {
-    compile: {
+    "compile": {
         "options": {
             // Which compiler to use. Can be latex, pdflatex, xelatex or lualatex
-            "compiler": "lualatex"
+            "compiler": "lualatex",
             // How many seconds to wait before killing the process. Default is 60.
             "timeout": 40 
         },
         // The main file to run LaTeX on
         "rootResourcePath": "main.tex", 
         // An array of files to include in the compilation. May have either the content
-        // passed directly, or a URL where it can be downlaoded.
+        // passed directly, or a URL where it can be downloaded.
         "resources": [{
             "path": "main.tex",
             "content": "\\documentclass{article}\n\\begin{document}\nHello World\n\\end{document}"

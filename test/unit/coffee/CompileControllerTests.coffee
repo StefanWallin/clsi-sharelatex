@@ -18,6 +18,7 @@ describe "CompileController", ->
 		@Settings.externalUrl = "http://www.example.com"
 		@req = {}
 		@res = {}
+		@next = sinon.stub()
 
 	describe "compile", ->
 		beforeEach ->
@@ -65,7 +66,7 @@ describe "CompileController", ->
 
 			it "should return the JSON response", ->
 				@res.send
-					.calledWith(JSON.stringify
+					.calledWith(200,
 						compile:
 							status: "success"
 							error: null
@@ -82,11 +83,101 @@ describe "CompileController", ->
 		
 			it "should return the JSON response with the error", ->
 				@res.send
-					.calledWith(JSON.stringify
+					.calledWith(500,
 						compile:
-							status: "failure"
+							status: "error"
 							error:  @message
 							outputFiles: []
 					)
 					.should.equal true
+
+		describe "when the request times out", ->
+			beforeEach ->
+				@error = new Error(@message = "container timed out")
+				@error.timedout = true
+				@CompileManager.doCompile = sinon.stub().callsArgWith(1, @error, null)
+				@CompileController.compile @req, @res
+		
+			it "should return the JSON response with the timeout status", ->
+				@res.send
+					.calledWith(200,
+						compile:
+							status: "timedout"
+							error: @message
+							outputFiles: []
+					)
+					.should.equal true
+
+		describe "when the request returns no output files", ->
+			beforeEach ->
+				@CompileManager.doCompile = sinon.stub().callsArgWith(1, null, [])
+				@CompileController.compile @req, @res
+		
+			it "should return the JSON response with the failure status", ->
+				@res.send
+					.calledWith(200,
+						compile:
+							error: null
+							status: "failure"
+							outputFiles: []
+					)
+					.should.equal true
+
+	describe "syncFromCode", ->
+		beforeEach ->
+			@file = "main.tex"
+			@line = 42
+			@column = 5
+			@project_id = "mock-project-id"
+			@req.params =
+				project_id: @project_id
+			@req.query =
+				file: @file
+				line: @line.toString()
+				column: @column.toString()
+			@res.send = sinon.stub()
+
+			@CompileManager.syncFromCode = sinon.stub().callsArgWith(4, null, @pdfPositions = ["mock-positions"])
+			@CompileController.syncFromCode @req, @res, @next
+
+		it "should find the corresponding location in the PDF", ->
+			@CompileManager.syncFromCode
+				.calledWith(@project_id, @file, @line, @column)
+				.should.equal true
+
+		it "should return the positions", ->
+			@res.send
+				.calledWith(JSON.stringify
+					pdf: @pdfPositions
+				)
+				.should.equal true
+
+	describe "syncFromPdf", ->
+		beforeEach ->
+			@page = 5
+			@h = 100.23
+			@v = 45.67
+			@project_id = "mock-project-id"
+			@req.params =
+				project_id: @project_id
+			@req.query =
+				page: @page.toString()
+				h: @h.toString()
+				v: @v.toString()
+			@res.send = sinon.stub()
+
+			@CompileManager.syncFromPdf = sinon.stub().callsArgWith(4, null, @codePositions = ["mock-positions"])
+			@CompileController.syncFromPdf @req, @res, @next
+
+		it "should find the corresponding location in the code", ->
+			@CompileManager.syncFromPdf
+				.calledWith(@project_id, @page, @h, @v)
+				.should.equal true
+
+		it "should return the positions", ->
+			@res.send
+				.calledWith(JSON.stringify
+					code: @codePositions
+				)
+				.should.equal true
 

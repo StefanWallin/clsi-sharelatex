@@ -12,3 +12,5 @@ app.js
 cache
 .vagrant
 db.sqlite
+config/*
+bin/synctex

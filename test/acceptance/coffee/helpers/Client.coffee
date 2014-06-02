@@ -1,11 +1,11 @@
 request = require "request"
 fs = require "fs"
-Settings = require "../../../../app/js/Settings"
+Settings = require "settings-sharelatex"
 
 host = "localhost"
 
 module.exports = Client =
-	host: Settings.externalUrl
+	host: Settings.apis.clsi.url
 
 	randomId: () ->
 		Math.random().toString(16).slice(2)
@@ -22,7 +22,7 @@ module.exports = Client =
 
 	getOutputFile: (response, type) ->
 		for file in response.compile.outputFiles
-			if file.type == type
+			if file.type == type and file.url.match("output.#{type}")
 				return file
 		return null
 
@@ -31,6 +31,29 @@ module.exports = Client =
 		app = express()
 		app.use express.static(directory)
 		app.listen(port, host)
+
+	syncFromCode: (project_id, file, line, column, callback = (error, pdfPositions) ->) ->
+		request.get {
+			url: "#{@host}/project/#{project_id}/sync/code"
+			qs: {
+				file: file
+				line: line
+				column: column
+			}
+		}, (error, response, body) ->
+			return callback(error) if error?
+			callback null, JSON.parse(body)
+
+	syncFromPdf: (project_id, page, h, v, callback = (error, pdfPositions) ->) ->
+		request.get {
+			url: "#{@host}/project/#{project_id}/sync/pdf"
+			qs: {
+				page: page,
+				h: h, v: v
+			}
+		}, (error, response, body) ->
+			return callback(error) if error?
+			callback null, JSON.parse(body)
 
 	compileDirectory: (project_id, baseDirectory, directory, serverPort, callback = (error, res, body) ->) ->
 		resources = []
@@ -46,7 +69,7 @@ module.exports = Client =
 					return "#{entity}/#{subEntity}"
 			else if stat.isFile() and entity != "output.pdf"
 				extension = entity.split(".").pop()
-				if ["tex", "bib", "cls", "sty", "pdf_tex", "Rtex"].indexOf(extension) > -1
+				if ["tex", "bib", "cls", "sty", "pdf_tex", "Rtex", "ist", "md", "Rmd"].indexOf(extension) > -1
 					resources.push
 						path: entity
 						content: fs.readFileSync("#{baseDirectory}/#{directory}/#{entity}").toString()

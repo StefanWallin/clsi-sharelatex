@@ -1,3 +1,5 @@
+spawn = require("child_process").spawn
+
 module.exports = (grunt) ->
 	grunt.initConfig
 		coffee:
@@ -34,27 +36,15 @@ module.exports = (grunt) ->
 				dest: "test/smoke/js"
 				ext:  ".js"
 
-		watch:
-			app:
-				files: ['app/coffee/*.coffee']
-				tasks: ['coffee']
-
 		clean:
 			app: ["app/js/"]
 			unit_tests: ["test/unit/js"]
 			acceptance_tests: ["test/acceptance/js"]
 			smoke_tests: ["test/smoke/js"]
 
-		nodemon:
-			dev:
-				options:
-					file: 'app.js'
-
-		concurrent:
-			dev:
-				tasks: ['nodemon', 'watch']
-				options:
-					logConcurrentOutput: true
+		execute:
+			app:
+				src: "app.js"
 
 		mochaTest:
 			unit:
@@ -65,6 +55,7 @@ module.exports = (grunt) ->
 				options:
 					reporter: "spec"
 					timeout: 40000
+					grep: grunt.option("grep")
 				src: ["test/acceptance/js/**/*.js"]
 			smoke:
 				options:
@@ -73,15 +64,22 @@ module.exports = (grunt) ->
 				src: ["test/smoke/js/**/*.js"]
 
 	grunt.loadNpmTasks 'grunt-contrib-coffee'
-	grunt.loadNpmTasks 'grunt-contrib-watch'
 	grunt.loadNpmTasks 'grunt-contrib-clean'
-	grunt.loadNpmTasks 'grunt-nodemon'
-	grunt.loadNpmTasks 'grunt-concurrent'
 	grunt.loadNpmTasks 'grunt-mocha-test'
 	grunt.loadNpmTasks 'grunt-shell'
+	grunt.loadNpmTasks 'grunt-execute'
+	grunt.loadNpmTasks 'grunt-bunyan'
 
-	grunt.registerTask 'compile:app', ['clean:app', 'coffee:app', 'coffee:app_src', 'coffee:smoke_tests']
-	grunt.registerTask 'run',         ['compile:app', 'concurrent']
+	grunt.registerTask 'compile:bin', () ->	
+		callback = @async()
+		proc = spawn "cc", [
+			"-o", "bin/synctex", "-Isrc/synctex",
+			"src/synctex.c", "src/synctex/synctex_parser.c", "src/synctex/synctex_parser_utils.c", "-lz"
+		], stdio: "inherit"
+		proc.on "close", callback
+
+	grunt.registerTask 'compile:app', ['clean:app', 'coffee:app', 'coffee:app_src', 'coffee:smoke_tests', 'compile:bin']
+	grunt.registerTask 'run',         ['compile:app', 'bunyan', 'execute']
 
 	grunt.registerTask 'compile:unit_tests', ['clean:unit_tests', 'coffee:unit_tests']
 	grunt.registerTask 'test:unit',          ['compile:app', 'compile:unit_tests', 'mochaTest:unit']
